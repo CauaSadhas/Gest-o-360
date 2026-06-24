@@ -1,46 +1,41 @@
 # Publicar o Gestão360 Contábil na Vercel
 
-Esta versão foi preparada para rodar como aplicação Flask na Vercel. Antes de publicar, é obrigatório configurar um banco Turso/libSQL, porque o arquivo SQLite local não fica permanente no ambiente da Vercel.
+Esta versão usa a detecção automática de Flask da Vercel. O arquivo principal é `app.py`. O `vercel.json` foi mantido apenas com o schema e não possui mais a regra inválida `functions`.
 
-## 1. Criar o banco em nuvem
+## 1. Estrutura que precisa estar na raiz do GitHub
 
-1. Crie uma conta no Turso.
-2. Crie um novo banco de dados.
-3. Copie a URL do banco, que começa com `libsql://`.
-4. Gere um token de acesso ao banco.
+Na primeira tela do repositório devem aparecer diretamente:
 
-Você terá dois valores:
+- `app.py`
+- `requirements.txt`
+- `.python-version`
+- `vercel.json`
+- pastas `templates`, `static` e `public`
+
+Não deixe esses arquivos dentro de uma pasta extra. Na Vercel, o **Root Directory** deve apontar para a pasta onde está o `app.py`.
+
+## 2. Criar o banco em nuvem
+
+O arquivo SQLite local não é permanente na Vercel. Crie um banco Turso/libSQL e copie:
 
 ```text
 TURSO_DATABASE_URL=libsql://...
 TURSO_AUTH_TOKEN=...
 ```
 
-## 2. Criar a chave de segurança
+## 3. Criar a chave de segurança
 
-Crie uma sequência longa e aleatória para proteger as sessões do sistema. Exemplo de formato:
+Crie uma sequência longa e aleatória para proteger as sessões:
 
 ```text
 GESTAO360_SECRET=uma-chave-longa-diferente-e-secreta
 ```
 
-Não use o exemplo literalmente e não publique essa chave no GitHub.
-
-## 3. Enviar o projeto ao GitHub
-
-Envie todos os arquivos desta pasta, incluindo:
-
-- `app.py`
-- `requirements.txt`
-- `vercel.json`
-- pasta `templates`
-- pasta `static`
-
-Não envie arquivos `.env`, bancos locais, backups ou tokens.
+Não publique essa chave no GitHub.
 
 ## 4. Configurar na Vercel
 
-No projeto da Vercel, abra **Settings → Environment Variables** e cadastre:
+Abra **Settings → Environment Variables** e cadastre:
 
 ```text
 GESTAO360_SECRET
@@ -48,29 +43,28 @@ TURSO_DATABASE_URL
 TURSO_AUTH_TOKEN
 ```
 
-Adicione as três variáveis para **Production**, **Preview** e **Development** quando quiser usar o mesmo banco em todos os ambientes. Para maior segurança, use bancos separados em produção e testes.
+Marque pelo menos **Production**. Para testar previews, marque também **Preview**.
 
-## 5. Fazer o deploy
+## 5. Conferir as configurações do projeto
 
-Depois de salvar as variáveis, faça um novo deploy. Na primeira abertura, o sistema mostrará **Configuração inicial**.
+Em **Settings → Build and Deployment**:
 
-Crie:
+- Framework Preset: `Other` ou detecção automática
+- Build Command: deixe vazio
+- Output Directory: deixe vazio
+- Install Command: deixe automático
+- Root Directory: pasta que contém `app.py`
 
-- seu nome;
-- seu e-mail;
-- sua senha pessoal;
-- o código do escritório.
+## 6. Fazer novo deploy
 
-O código do escritório será usado pelos membros autorizados da equipe no botão **Criar minha conta**.
+Depois de enviar esta versão ao GitHub e salvar as variáveis, abra **Deployments**, escolha o último deploy e clique em **Redeploy**.
 
-## Como funcionam as contas
+Na primeira abertura, o sistema mostrará **Configuração inicial** para criar a primeira conta administradora.
 
-- A primeira conta é Administrador.
-- Novos cadastros próprios entram como Colaborador.
-- O administrador pode mudar o perfil na tela **Usuários**.
-- O administrador pode trocar o código ou bloquear novos cadastros em **Configurações**.
-- Todos os usuários autorizados compartilham os dados do mesmo escritório.
+## Correção do erro “pattern app.py defined in functions”
 
-## Atenção
+Esse erro era causado por uma configuração antiga que tentava tratar `app.py` como se estivesse dentro da pasta `api`. A configuração foi removida. A Vercel reconhece automaticamente uma instância Flask chamada `app` em `app.py`.
 
-Este modo é destinado à equipe de um único escritório. Ele não separa dados entre empresas diferentes. Para vender o sistema como SaaS para vários escritórios, será necessária uma estrutura de organizações isoladas.
+## Atenção sobre anexos
+
+Clientes, tarefas e cobranças ficam no banco Turso. Já os anexos enviados para atividades ainda usam armazenamento temporário da função e podem desaparecer após reinicializações. Antes de usar anexos em produção, conecte a área de arquivos a um armazenamento permanente, como Vercel Blob ou outro serviço compatível.

@@ -163,3 +163,7 @@ Os relatórios foram separados para não misturar operação com financeiro:
 - suporte opcional ao banco Turso/libSQL para persistência na Vercel;
 - anexos são armazenados no banco quando o Turso está ativo;
 - inicialização do banco também funciona quando o Flask é carregado pela Vercel.
+
+## Publicação na Vercel
+
+A Vercel detecta automaticamente o Flask pelo arquivo `app.py`. Não adicione uma regra `functions` apontando para `app.py`. Consulte `PUBLICAR_NA_VERCEL.md` e configure `GESTAO360_SECRET`, `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN`.

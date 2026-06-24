@@ -1361,6 +1361,16 @@ def create_full_backup():
 
 @app.context_processor
 def inject_globals():
+    # A página de configuração da Vercel precisa funcionar antes de o banco existir.
+    if IS_VERCEL and globals().get("MISSING_VERCEL_ENV"):
+        return {
+            "app_name": APP_NAME,
+            "money": money,
+            "hours": hours,
+            "month_label": month_label,
+            "can_view_financial": False,
+            "current_month": current_month(),
+        }
     return {
         "app_name": APP_NAME,
         "money": money,
@@ -3957,14 +3967,31 @@ def datetimebr(value):
 
 
 # A Vercel não mantém um arquivo SQLite local de forma permanente.
-# Impedimos o sistema de iniciar sem banco em nuvem para evitar perda silenciosa de dados.
-if IS_VERCEL and not TURSO_DATABASE_URL:
-    raise RuntimeError(
-        "Configure TURSO_DATABASE_URL, TURSO_AUTH_TOKEN e GESTAO360_SECRET nas variáveis de ambiente da Vercel."
-    )
+# O aplicativo precisa continuar importável durante o build, mesmo antes das variáveis
+# de produção serem cadastradas. Quando faltar configuração, mostramos uma página clara
+# em vez de derrubar o deploy com erro de inicialização.
+REQUIRED_VERCEL_ENV = {
+    "TURSO_DATABASE_URL": TURSO_DATABASE_URL,
+    "TURSO_AUTH_TOKEN": TURSO_AUTH_TOKEN,
+    "GESTAO360_SECRET": (os.environ.get("GESTAO360_SECRET") or "").strip(),
+}
+MISSING_VERCEL_ENV = [name for name, value in REQUIRED_VERCEL_ENV.items() if not value]
 
-# A inicialização também precisa ocorrer quando o Flask é carregado pela Vercel.
-init_db()
+
+@app.before_request
+def require_vercel_configuration():
+    if IS_VERCEL and MISSING_VERCEL_ENV:
+        return render_template(
+            "vercel_setup.html",
+            missing_variables=MISSING_VERCEL_ENV,
+            app_name=APP_NAME,
+        ), 503
+
+
+# Inicializa o banco local normalmente e o banco remoto apenas quando a configuração
+# da Vercel estiver completa.
+if not (IS_VERCEL and MISSING_VERCEL_ENV):
+    init_db()
 
 
 if __name__ == "__main__":
