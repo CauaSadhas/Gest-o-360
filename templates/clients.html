@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div><h1>Clientes</h1><p>Pesquise, filtre e abra a ficha completa de cada cliente.</p></div>
+    {% if session.get('role') == 'Administrador' %}<a class="btn primary" href="{{ url_for('client_new') }}">+ Novo cliente</a>{% endif %}
+</div>
+
+<section class="card">
+    <form class="filters" method="get">
+        <input name="search" placeholder="Pesquisar por nome, CPF/CNPJ ou responsável" value="{{ search }}">
+        <select name="status">
+            <option value="">Todos os status</option>
+            {% for s in statuses %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+        <button class="btn">Filtrar</button>
+    </form>
+    <table>
+        <thead><tr><th>Cliente</th><th>CPF/CNPJ</th><th>Tipo</th><th>Responsável</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for c in clients %}
+            <tr>
+                <td><strong>{{ c.name }}</strong><br><span class="muted">{{ c.email or '-' }}</span></td>
+                <td>{{ c.document or '-' }}</td>
+                <td>{{ c.client_type or '-' }}</td>
+                <td>{{ c.responsible or '-' }}</td>
+                <td><span class="badge">{{ c.status }}</span></td>
+                <td><a class="btn small" href="{{ url_for('client_detail', client_id=c.id) }}">Abrir ficha</a></td>
+            </tr>
+        {% else %}<tr><td colspan="6">Nenhum cliente encontrado.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header"><div><h1>Configurações</h1><p>Ajustes gerais, permissões e criação de contas.</p></div></div>
+
+<form method="post" class="grid two top-align">
+    <section class="card">
+        <h2>Permissões financeiras</h2>
+        <label class="check-row">
+            <input type="checkbox" name="hide_financial_for_collab" {% if hide_financial_for_collab %}checked{% endif %}>
+            <span>Bloquear informações financeiras para colaboradores</span>
+        </label>
+        <p class="muted">Administradores continuam com acesso completo às contas a receber e aos relatórios financeiros.</p>
+    </section>
+
+    <section class="card">
+        <h2>Criação de novas contas</h2>
+        <label class="check-row">
+            <input type="checkbox" name="allow_self_registration" {% if allow_self_registration %}checked{% endif %}>
+            <span>Permitir que membros da equipe criem a própria conta</span>
+        </label>
+        <label>Novo código do escritório
+            <input name="new_registration_code" type="password" minlength="6" placeholder="Deixe em branco para manter o código atual">
+        </label>
+        <p class="muted">
+            Status do código: <strong>{{ 'Configurado' if has_registration_code else 'Ainda não configurado' }}</strong>.
+            Compartilhe esse código somente com pessoas autorizadas. Novas contas entram como Colaborador.
+        </p>
+    </section>
+
+    <section class="card full-span">
+        <div class="actions-row">
+            <button class="btn primary" type="submit">Salvar configurações</button>
+        </div>
+    </section>
+</form>
+{% endblock %}

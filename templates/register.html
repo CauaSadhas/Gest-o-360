@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block public_content %}
+<div class="login-page landing-login">
+    {% include "_auth_hero.html" %}
+
+    <section class="login-card-wrap">
+        <form class="login-card auth-card-tall" method="post" autocomplete="on">
+            <div>
+                <span class="form-kicker">NOVO USUÁRIO</span>
+                <h2>Crie sua conta</h2>
+                <p>Use o código do escritório enviado pelo administrador.</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}
+                {% endif %}
+            {% endwith %}
+            <label>Nome completo
+                <input name="name" value="{{ request.form.get('name', '') }}" autocomplete="name" required autofocus>
+            </label>
+            <label>E-mail profissional
+                <input name="email" type="email" value="{{ request.form.get('email', '') }}" placeholder="seu@email.com.br" autocomplete="email" required>
+            </label>
+            <label>Senha
+                <input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres, com letra e número" required>
+            </label>
+            <label>Confirmar senha
+                <input name="password_confirmation" type="password" minlength="8" autocomplete="new-password" required>
+            </label>
+            <label>Código do escritório
+                <input name="registration_code" type="password" autocomplete="off" placeholder="Código fornecido pelo administrador" required>
+            </label>
+            <button class="btn primary login-submit" type="submit">Criar conta e entrar</button>
+            <p class="auth-note">A conta será criada inicialmente como <strong>Colaborador</strong>. O administrador pode alterar permissões depois.</p>
+            <a class="auth-back-link" href="{{ url_for('login') }}">← Voltar para o login</a>
+        </form>
+    </section>
+</div>
+{% endblock %}

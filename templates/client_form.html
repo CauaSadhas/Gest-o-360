@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div><h1>{{ 'Editar cliente' if client else 'Cadastro de cliente' }}</h1><p>Preencha os dados principais do cliente.</p></div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('clients') }}">Voltar</a>
+    </div>
+</div>
+
+<form class="card form-grid" method="post">
+    <label>Nome do cliente<input name="name" value="{{ client.name if client else '' }}" required></label>
+    <label>CPF ou CNPJ<input name="document" value="{{ client.document if client else '' }}"></label>
+    <label>Tipo de cliente<select name="client_type">
+        {% for t in client_types %}<option value="{{ t }}" {% if client and client.client_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></label>
+    <label>Telefone<input name="phone" value="{{ client.phone if client else '' }}"></label>
+    <label>E-mail<input name="email" type="email" value="{{ client.email if client else '' }}"></label>
+    <label>Responsável pelo cliente<input name="responsible" value="{{ client.responsible if client else '' }}"></label>
+    <label>Valor mensal cobrado<input name="monthly_fee" type="text" class="money-mask" inputmode="decimal" value="{{ money(client.monthly_fee) if client else 'R$ 0,00' }}" placeholder="R$ 0,00"></label>
+    <label>Status<select name="status">
+        {% for s in statuses %}<option value="{{ s }}" {% if client and client.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select></label>
+    <label class="full">Observações gerais<textarea name="notes" rows="4">{{ client.notes if client else '' }}</textarea></label>
+    <div class="full actions"><button class="btn primary" type="submit">Salvar cliente</button></div>
+</form>
+
+{% if client %}
+<section class="card danger-zone">
+    <div>
+        <h2>Excluir cliente</h2>
+        <p>Use esta opção somente se quiser apagar definitivamente este cliente. As atividades e contas a receber vinculadas a ele também serão excluídas.</p>
+    </div>
+    <form method="post" action="{{ url_for('client_delete', client_id=client.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir este cliente? Todas as atividades e contas a receber vinculadas a ele também serão excluídas. Essa ação não pode ser desfeita.');">
+        <button class="btn danger" type="submit">Excluir cliente definitivamente</button>
+    </form>
+</section>
+{% endif %}
+
+<script>
+(function () {
+    function formatBRL(value) {
+        const cents = String(value || '').replace(/\D/g, '');
+        return (parseInt(cents || '0', 10) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    document.querySelectorAll('.money-mask').forEach(function(input) {
+        input.addEventListener('input', function() { input.value = formatBRL(input.value); });
+        input.addEventListener('blur', function() { if (input.value) input.value = formatBRL(input.value); });
+    });
+})();
+</script>
+{% endblock %}

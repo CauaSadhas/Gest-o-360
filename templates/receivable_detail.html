@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Ficha da cobrança</h1>
+        <p>{{ receivable.client_name }} • {{ receivable.description }}</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('receivables') }}">Voltar</a>
+        <a class="btn" href="{{ url_for('client_detail', client_id=receivable.client_id) }}">Abrir cliente</a>
+        {% if session.get('role') == 'Administrador' %}
+        <a class="btn primary" href="{{ url_for('receivable_edit', receivable_id=receivable.id) }}">Editar cobrança</a>
+        {% if has_open_installments %}
+        <form method="post" action="{{ url_for('receivable_cancel_group', receivable_id=receivable.id) }}" onsubmit="return confirm('Cancelar todas as parcelas sem baixa desta cobrança? Parcelas com baixa serão preservadas.');">
+            <button class="btn warning" type="submit">Cancelar em aberto</button>
+        </form>
+        {% endif %}
+        {% if not has_paid_installments and not partial_count %}
+        <form method="post" action="{{ url_for('receivable_delete_group', receivable_id=receivable.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir esta cobrança inteira e todas as parcelas dela? Essa ação não pode ser desfeita.');">
+            <button class="btn danger" type="submit">Excluir cobrança inteira</button>
+        </form>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Total ativo da cobrança</span><strong>{{ money(total_amount) }}</strong></div>
+    <div class="card metric success"><span>Total baixado</span><strong>{{ money(paid_amount) }}</strong></div>
+    <div class="card metric warning"><span>Saldo em aberto</span><strong>{{ money(open_amount) }}</strong></div>
+    <div class="card metric"><span>Cancelado</span><strong>{{ money(cancelled_amount) }}</strong></div>
+</section>
+
+<div class="grid two top-align">
+    <section class="card">
+        <h2>Dados da cobrança</h2>
+        <div class="info-list">
+            <p><span>Cliente</span><strong>{{ receivable.client_name }}</strong></p>
+            <p><span>Descrição</span><strong>{{ receivable.description }}</strong></p>
+            <p><span>Valor da parcela selecionada</span><strong>{{ money(receivable.amount) }}</strong></p>
+            <p><span>Já baixado na parcela</span><strong>{{ money(receivable_paid_amount(receivable)) }}</strong></p>
+            <p><span>Saldo da parcela</span><strong>{{ money(receivable_remaining_amount(receivable)) }}</strong></p>
+            <p><span>Parcelamento</span><strong>{% if (receivable.installment_total or 1) > 1 %}{{ receivable.installment_total }} parcelas{% else %}À vista{% endif %}</strong></p>
+            <p><span>Parcelas baixadas</span><strong>{{ paid_count }}/{{ installments|length }}</strong></p>
+            <p><span>Parcelas parciais</span><strong>{{ partial_count }}</strong></p>
+            <p><span>Parcelas canceladas</span><strong>{{ cancelled_count }}</strong></p>
+            <p><span>Observações</span><strong>{{ receivable.notes or '-' }}</strong></p>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Registrar baixa da parcela selecionada</h2>
+        {% if can_receive_payment(receivable) %}
+        <form class="compact-form" method="post" action="{{ url_for('mark_paid', receivable_id=receivable.id) }}">
+            <label>Valor recebido
+                <input name="payment_amount" type="text" class="money-mask" inputmode="decimal" value="{{ money(receivable_remaining_amount(receivable)) }}" required>
+            </label>
+            <label>Data de pagamento<input name="payment_date" type="date" value="{{ today }}" required></label>
+            <label>Forma de pagamento<select name="payment_method">{% for p in payment_methods %}<option>{{ p }}</option>{% endfor %}</select></label>
+            <label>Observação da baixa<textarea name="payment_notes" rows="2" placeholder="Ex.: pagamento parcial, comprovante enviado..."></textarea></label>
+            <button class="btn primary" type="submit">Registrar baixa</button>
+            <p class="muted-small">Para baixa parcial, informe um valor menor que o saldo. Para baixa total, mantenha o valor completo.</p>
+        </form>
+        {% if can_cancel_receivable(receivable) %}
+        <form class="compact-form" method="post" action="{{ url_for('receivable_cancel', receivable_id=receivable.id) }}" onsubmit="return confirm('Cancelar esta parcela? Ela ficará no histórico, mas sairá do saldo em aberto.');">
+            <button class="btn warning" type="submit">Cancelar parcela selecionada</button>
+        </form>
+        {% endif %}
+        {% elif computed_receivable_status(receivable) == 'Pago' %}
+        <p>Essa parcela já foi baixada integralmente em {{ receivable.payment_date|datebr }}.</p>
+        {% elif computed_receivable_status(receivable) == 'Cancelado' %}
+        <p>Essa parcela está cancelada e permanece apenas como histórico.</p>
+        {% endif %}
+
+        {% if session.get('role') == 'Administrador' and has_receivable_payment(receivable) %}
+        <form class="compact-form" method="post" action="{{ url_for('receivable_undo_payment', receivable_id=receivable.id) }}" onsubmit="return confirm('Desfazer todas as baixas desta parcela? Ela voltará para o saldo em aberto.');">
+            <button class="btn danger" type="submit">Desfazer baixa da parcela</button>
+        </form>
+        {% endif %}
+    </section>
+</div>
+
+<section class="card">
+    <h2>Parcelas da cobrança</h2>
+    <table>
+        <thead><tr><th>Parcela</th><th>Valor</th><th>Pago</th><th>Saldo</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Forma</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for r in installments %}
+        <tr>
+            <td><span class="badge">{{ r.installment_number }}/{{ r.installment_total }}</span></td>
+            <td>{{ money(r.amount) }}</td>
+            <td>{{ money(receivable_paid_amount(r)) }}</td>
+            <td><strong>{{ money(receivable_remaining_amount(r)) }}</strong></td>
+            <td>{{ r.due_date|datebr }}</td>
+            <td>{{ r.payment_date|datebr }}</td>
+            <td><span class="badge">{{ computed_receivable_status(r) }}</span></td>
+            <td>{{ r.payment_method or '-' }}</td>
+            <td>
+                <div class="actions-row">
+                    <a class="btn small" href="{{ url_for('receivable_detail', receivable_id=r.id) }}">Abrir</a>
+                    {% if can_receive_payment(r) %}
+                    <form method="post" action="{{ url_for('mark_paid', receivable_id=r.id) }}">
+                        <input type="hidden" name="payment_date" value="{{ today }}">
+                        <button class="btn small" type="submit">Baixar saldo</button>
+                    </form>
+                    {% endif %}
+                    {% if session.get('role') == 'Administrador' and has_receivable_payment(r) %}
+                    <form method="post" action="{{ url_for('receivable_undo_payment', receivable_id=r.id) }}" onsubmit="return confirm('Desfazer todas as baixas desta parcela?');">
+                        <button class="btn small warning" type="submit">Desfazer baixa</button>
+                    </form>
+                    {% endif %}
+                    {% if session.get('role') == 'Administrador' and can_cancel_receivable(r) %}
+                    <form method="post" action="{{ url_for('receivable_cancel', receivable_id=r.id) }}" onsubmit="return confirm('Cancelar esta parcela? Ela ficará no histórico, mas sairá do saldo em aberto.');">
+                        <button class="btn small warning" type="submit">Cancelar</button>
+                    </form>
+                    <form method="post" action="{{ url_for('receivable_delete', receivable_id=r.id) }}" onsubmit="return confirm('Excluir esta parcela gerada indevidamente? Essa ação não pode ser desfeita.');">
+                        <button class="btn small danger" type="submit">Excluir</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% else %}<tr><td colspan="9">Nenhuma parcela encontrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    <p class="muted-small">Regra de segurança: parcelas com baixa integral ou parcial não podem ser excluídas nem canceladas. Para corrigir erro, use Desfazer baixa.</p>
+</section>
+
+<section class="card">
+    <h2>Histórico de baixas</h2>
+    <table>
+        <thead><tr><th>Data</th><th>Parcela</th><th>Valor recebido</th><th>Forma</th><th>Responsável</th><th>Observação</th></tr></thead>
+        <tbody>
+        {% for p in payments %}
+        <tr>
+            <td>{{ p.payment_date|datebr }}</td>
+            <td>{{ p.installment_number }}/{{ p.installment_total }}</td>
+            <td>{{ money(p.amount) }}</td>
+            <td>{{ p.payment_method or '-' }}</td>
+            <td>{{ p.created_by or '-' }}</td>
+            <td>{{ p.notes or '-' }}</td>
+        </tr>
+        {% else %}<tr><td colspan="6">Nenhuma baixa registrada nesta cobrança.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+(function () {
+    function formatBRL(value) {
+        const cents = String(value || '').replace(/\D/g, '');
+        return (parseInt(cents || '0', 10) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    document.querySelectorAll('.money-mask').forEach(function(input) {
+        input.addEventListener('input', function() { input.value = formatBRL(input.value); });
+        input.addEventListener('blur', function() { if (input.value) input.value = formatBRL(input.value); });
+    });
+})();
+</script>
+{% endblock %}

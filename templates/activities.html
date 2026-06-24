@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Atividades / Serviços</h1>
+        <p>Organize as tarefas do escritório em um quadro Kanban estilo Trello.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="#nova-atividade">+ Nova atividade</a>
+        {% if session.get('role') == 'Administrador' %}<a class="btn" href="{{ url_for('recurring_tasks', month=month) }}">Rotinas mensais</a>{% endif %}
+        <a class="btn" href="#lista-atividades">Ver lista</a>
+    </div>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Atividades filtradas</span><strong>{{ activities|length }}</strong></div>
+    <div class="card metric"><span>Horas filtradas</span><strong>{{ hours(total_hours) }}</strong></div>
+    <div class="card metric warning"><span>Atrasadas</span><strong>{{ overdue_count }}</strong></div>
+    <div class="card metric success"><span>Concluídas</span><strong>{{ kanban_counts.get('Concluído', 0) }}</strong></div>
+</section>
+
+<div class="grid two top-align">
+    <section class="card" id="nova-atividade">
+        <h2>Nova atividade</h2>
+        <form method="post" class="compact-form">
+            <label>Cliente
+                <select name="client_id" required>
+                    {% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                </select>
+            </label>
+            <div class="form-grid">
+                <label>Data da atividade<input type="date" name="activity_date" value="{{ today }}" required></label>
+                <label>Prazo / vencimento<input type="date" name="due_date"></label>
+            </div>
+            <div class="form-grid">
+                <label>Tipo de serviço
+                    <select name="service_type">{% for s in service_types %}<option>{{ s }}</option>{% endfor %}</select>
+                </label>
+                <label>Prioridade
+                    <select name="priority">{% for p in activity_priorities %}<option {% if p == 'Média' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+                </label>
+            </div>
+            <label>Descrição do que foi feito<textarea name="description" rows="4" required></textarea></label>
+            <label>Colaborador responsável<input name="collaborator" value="{{ session.get('name') }}"></label>
+
+            <div class="timer-field">
+                <span class="timer-label">Tempo gasto na atividade</span>
+                <input type="hidden" name="time_spent" class="timer-hours-input" value="0" required>
+                <div class="timer-widget" data-initial-seconds="0">
+                    <div class="timer-display" aria-live="polite">00:00:00</div>
+                    <div class="timer-buttons">
+                        <button class="btn primary timer-start" type="button">▶ Iniciar</button>
+                        <button class="btn timer-pause" type="button" disabled>⏸ Pausar</button>
+                        <button class="btn timer-reset" type="button">↺ Zerar</button>
+                    </div>
+                    <small>Ao salvar, o tempo do cronômetro será convertido automaticamente em horas.</small>
+                </div>
+            </div>
+
+            <label>Status
+                <select name="status">
+                    {% for s in activity_statuses %}<option {% if s == 'Pendente' %}selected{% endif %}>{{ s }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>Observações<textarea name="notes" rows="2"></textarea></label>
+            <button class="btn primary" type="submit">Salvar atividade</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Filtros do Kanban</h2>
+        <form class="compact-form" method="get">
+            <div class="form-grid">
+                <label>Mês<input type="month" name="month" value="{{ month }}"></label>
+                <label>Cliente
+                    <select name="client_id"><option value="">Todos</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+                </label>
+            </div>
+            <div class="form-grid">
+                <label>Colaborador<input name="collaborator" value="{{ collaborator }}"></label>
+                <label>Tipo de serviço
+                    <select name="service_type"><option value="">Todos</option>{% for s in service_types %}<option value="{{ s }}" {% if service_type == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+                </label>
+            </div>
+            <div class="form-grid">
+                <label>Status
+                    <select name="status"><option value="">Todos</option>{% for s in activity_statuses %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+                </label>
+                <label>Prioridade
+                    <select name="priority"><option value="">Todas</option>{% for p in activity_priorities %}<option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+                </label>
+            </div>
+            <div class="actions-row">
+                <button class="btn primary" type="submit">Aplicar filtros</button>
+                <a class="btn" href="{{ url_for('activities') }}">Limpar</a>
+            </div>
+        </form>
+        <div class="summary-box">
+            <span>Prioridades no filtro atual</span>
+            <strong>{{ priority_counts.get('Urgente', 0) }} urgente · {{ priority_counts.get('Alta', 0) }} alta</strong>
+        </div>
+    </section>
+</div>
+
+<section class="kanban-shell">
+    <div class="section-title kanban-title">
+        <div>
+            <h2>Quadro Kanban</h2>
+            <p class="muted-small">Arraste os cartões entre as colunas ou use os botões de avançar/voltar.</p>
+        </div>
+    </div>
+
+    <div class="kanban-board">
+        {% for status in activity_statuses %}
+        <section class="kanban-column" data-status="{{ status }}">
+            <header class="kanban-column-head">
+                <strong>{{ status }}</strong>
+                <span>{{ kanban_counts.get(status, 0) }}</span>
+            </header>
+            <div class="kanban-dropzone" data-status="{{ status }}">
+                {% for a in activities %}
+                    {% if a.status == status %}
+                    <article class="kanban-card priority-{{ (a.priority or 'Média')|lower|replace('é','e')|replace('ú','u') }} {% if activity_is_overdue(a) %}is-overdue{% endif %}"
+                             draggable="true"
+                             data-activity-id="{{ a.id }}"
+                             data-current-status="{{ a.status }}"
+                             data-status-url="{{ url_for('activity_quick_status', activity_id=a.id) }}">
+                        <div class="kanban-card-top">
+                            <span class="priority-pill">{{ a.priority or 'Média' }}</span>
+                            <span class="kanban-card-tags">
+                                {% if a.recurrence_template_id %}<span class="recurring-pill">Recorrente</span>{% endif %}
+                                {% if activity_is_overdue(a) %}<span class="overdue-pill">Atrasada</span>{% endif %}
+                            </span>
+                        </div>
+                        <h3>{{ a.description }}</h3>
+                        <p>{{ a.client_name }}</p>
+                        <div class="kanban-meta">
+                            <span>{{ a.service_type }}</span>
+                            <span>{{ hours(a.time_spent) }}</span>
+                        </div>
+                        <div class="kanban-meta">
+                            <span>Data: {{ a.activity_date|datebr }}</span>
+                            <span>Prazo: {{ a.due_date|datebr if a.due_date else '-' }}</span>
+                        </div>
+                        <div class="kanban-meta">
+                            <span>Resp.: {{ a.collaborator or '-' }}</span>
+                        </div>
+                        {% set ck = checklist_stats.get(a.id, {'total': 0, 'done': 0, 'percent': 0}) %}
+                        <div class="kanban-checklist-mini {% if ck.total and ck.done == ck.total %}done{% endif %}">
+                            <span>Checklist: {{ ck.done }}/{{ ck.total }}</span>
+                            <div><i style="width: {{ ck.percent }}%"></i></div>
+                        </div>
+                        <div class="kanban-actions">
+                            {% set previous_status = activity_next_status(a.status, 'previous') %}
+                            {% set next_status = activity_next_status(a.status, 'next') %}
+                            {% if previous_status != a.status %}
+                            <form method="post" action="{{ url_for('activity_quick_status', activity_id=a.id) }}">
+                                <input type="hidden" name="status" value="{{ previous_status }}">
+                                <button class="btn small" type="submit">← Voltar</button>
+                            </form>
+                            {% endif %}
+                            <a class="btn small" href="{{ url_for('activity_detail', activity_id=a.id) }}">Abrir</a>
+                            {% if next_status != a.status %}
+                            <form method="post" action="{{ url_for('activity_quick_status', activity_id=a.id) }}">
+                                <input type="hidden" name="status" value="{{ next_status }}">
+                                <button class="btn small primary" type="submit">Avançar →</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </article>
+                    {% endif %}
+                {% endfor %}
+                <div class="kanban-empty">Solte uma atividade aqui</div>
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card" id="lista-atividades">
+    <h2>Lista de atividades do mês</h2>
+    <table>
+        <thead><tr><th>Data</th><th>Prazo</th><th>Cliente</th><th>Tipo</th><th>Descrição</th><th>Prioridade</th><th>Origem</th><th>Checklist</th><th>Colaborador</th><th>Tempo</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for a in activities %}
+        <tr>
+            <td>{{ a.activity_date|datebr }}</td>
+            <td>{% if a.due_date %}{{ a.due_date|datebr }}{% else %}-{% endif %}</td>
+            <td><a href="{{ url_for('client_detail', client_id=a.client_id) }}">{{ a.client_name }}</a></td>
+            <td>{{ a.service_type }}</td>
+            <td>{{ a.description }}</td>
+            <td><span class="priority-pill">{{ a.priority or 'Média' }}</span></td>
+            <td>{% if a.recurrence_template_id %}<span class="recurring-pill">Recorrente</span>{% else %}<span class="muted">Manual</span>{% endif %}</td>
+            {% set ck = checklist_stats.get(a.id, {'total': 0, 'done': 0, 'percent': 0}) %}
+            <td>{{ ck.done }}/{{ ck.total }}</td>
+            <td>{{ a.collaborator or '-' }}</td>
+            <td>{{ hours(a.time_spent) }}</td>
+            <td><span class="badge">{{ a.status }}</span></td>
+            <td><a class="btn small" href="{{ url_for('activity_detail', activity_id=a.id) }}">Abrir ficha</a></td>
+        </tr>
+        {% else %}<tr><td colspan="12">Nenhuma atividade encontrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+(function () {
+    function formatTime(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function updateHidden(widget, totalSeconds) {
+        const form = widget.closest('form');
+        const input = form ? form.querySelector('.timer-hours-input') : null;
+        if (input) input.value = (totalSeconds / 3600).toFixed(4);
+    }
+
+    document.querySelectorAll('.timer-widget').forEach(function (widget) {
+        const display = widget.querySelector('.timer-display');
+        const startBtn = widget.querySelector('.timer-start');
+        const pauseBtn = widget.querySelector('.timer-pause');
+        const resetBtn = widget.querySelector('.timer-reset');
+        const form = widget.closest('form');
+        let totalSeconds = Number(widget.dataset.initialSeconds || 0);
+        let timer = null;
+
+        function render() { display.textContent = formatTime(totalSeconds); updateHidden(widget, totalSeconds); }
+        function start() {
+            if (timer) return;
+            timer = setInterval(function () { totalSeconds += 1; render(); }, 1000);
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            startBtn.textContent = '▶ Rodando';
+        }
+        function pause() {
+            if (timer) { clearInterval(timer); timer = null; }
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            startBtn.textContent = totalSeconds > 0 ? '▶ Continuar' : '▶ Iniciar';
+        }
+        function reset() { pause(); totalSeconds = 0; render(); }
+        startBtn.addEventListener('click', start);
+        pauseBtn.addEventListener('click', pause);
+        resetBtn.addEventListener('click', reset);
+        if (form) {
+            form.addEventListener('submit', function (event) {
+                render();
+                if (totalSeconds <= 0) {
+                    const ok = confirm('O cronômetro está zerado. Deseja salvar a atividade com 0 hora?');
+                    if (!ok) event.preventDefault();
+                }
+            });
+        }
+        render();
+    });
+
+    let draggedCard = null;
+    document.querySelectorAll('.kanban-card').forEach(function (card) {
+        card.addEventListener('dragstart', function () {
+            draggedCard = card;
+            card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', function () {
+            card.classList.remove('dragging');
+            draggedCard = null;
+        });
+    });
+
+    document.querySelectorAll('.kanban-dropzone').forEach(function (zone) {
+        zone.addEventListener('dragover', function (event) {
+            event.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', function () {
+            zone.classList.remove('drag-over');
+        });
+        zone.addEventListener('drop', function (event) {
+            event.preventDefault();
+            zone.classList.remove('drag-over');
+            if (!draggedCard) return;
+            const newStatus = zone.dataset.status;
+            const currentStatus = draggedCard.dataset.currentStatus;
+            if (newStatus === currentStatus) return;
+
+            const form = new FormData();
+            form.append('status', newStatus);
+            fetch(draggedCard.dataset.statusUrl, {
+                method: 'POST',
+                body: form,
+                headers: { 'Accept': 'application/json' }
+            }).then(function (response) {
+                if (!response.ok) throw new Error('Erro ao mover atividade');
+                zone.prepend(draggedCard);
+                draggedCard.dataset.currentStatus = newStatus;
+                window.location.reload();
+            }).catch(function () {
+                alert('Não foi possível mover a atividade. Tente pelo botão Avançar/Voltar.');
+            });
+        });
+    });
+})();
+</script>
+{% endblock %}

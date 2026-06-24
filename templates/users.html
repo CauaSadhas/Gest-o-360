@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header"><div><h1>Usuários</h1><p>Gerencie administradores e colaboradores do escritório.</p></div></div>
+
+<div class="grid two top-align">
+    <section class="card">
+        <h2>Novo usuário</h2>
+        <form method="post" class="compact-form">
+            <label>Nome<input name="name" required></label>
+            <label>E-mail<input name="email" type="email" required></label>
+            <label>Senha inicial<input name="password" type="password" required minlength="8" placeholder="Mínimo 8 caracteres, com letra e número"></label>
+            <label>Perfil<select name="role"><option>Administrador</option><option>Colaborador</option></select></label>
+            <button class="btn primary" type="submit">Criar usuário</button>
+        </form>
+    </section>
+    <section class="card">
+        <h2>Permissões e cadastro próprio</h2>
+        <p><strong>Administrador:</strong> vê tudo, cadastra clientes, edita informações, acessa financeiro e relatórios.</p>
+        <p><strong>Colaborador:</strong> registra atividades e acessa clientes; o financeiro pode ser bloqueado nas configurações.</p>
+        <p>Os membros da equipe também podem usar o botão <strong>Criar minha conta</strong> na tela de login, informando o código do escritório configurado pelo administrador.</p>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Lista de usuários</h2>
+    <table>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+            <tr>
+                <td>{{ u.name }}</td>
+                <td>{{ u.email }}</td>
+                <td>
+                    {% if u.id == session.get('user_id') %}
+                        <span class="badge">{{ u.role }}</span>
+                    {% else %}
+                        <form method="post" action="{{ url_for('update_user_role', user_id=u.id) }}" class="inline-form">
+                            <select name="role">
+                                <option value="Administrador" {% if u.role == 'Administrador' %}selected{% endif %}>Administrador</option>
+                                <option value="Colaborador" {% if u.role == 'Colaborador' %}selected{% endif %}>Colaborador</option>
+                            </select>
+                            <button class="btn small" type="submit">Salvar perfil</button>
+                        </form>
+                    {% endif %}
+                </td>
+                <td><span class="badge">{{ 'Ativo' if u.active else 'Inativo' }}</span></td>
+                <td>
+                    {% if u.id != session.get('user_id') %}
+                    <form method="post" action="{{ url_for('toggle_user', user_id=u.id) }}"><button class="btn small" type="submit">Alternar status</button></form>
+                    {% else %}
+                    <span class="muted">Conta atual</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}<tr><td colspan="5">Nenhum usuário.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

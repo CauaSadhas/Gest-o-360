@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Rotinas mensais</h1>
+        <p>Cadastre tarefas que se repetem todo mês e gere automaticamente para os clientes ativos.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="#nova-rotina">+ Nova rotina</a>
+        <a class="btn" href="{{ url_for('activities', month=month) }}">Ver Kanban do mês</a>
+    </div>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Modelos cadastrados</span><strong>{{ templates|length }}</strong></div>
+    <div class="card metric success"><span>Rotinas ativas</span><strong>{{ active_count }}</strong></div>
+    <div class="card metric"><span>Geradas em {{ month_label(month) }}</span><strong>{{ generated_count }}</strong></div>
+    <div class="card metric warning"><span>Mês de geração</span><strong>{{ month_label(month) }}</strong></div>
+</section>
+
+<div class="grid two top-align">
+    <section class="card" id="nova-rotina">
+        <h2>Nova rotina mensal</h2>
+        <p class="muted-small">Use para tarefas que voltam todo mês, como fechamento fiscal, folha, envio de guia ou conciliação.</p>
+        <form method="post" class="compact-form recurring-form">
+            <label>Cliente
+                <select name="client_id">
+                    <option value="">Todos os clientes ativos</option>
+                    {% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                </select>
+            </label>
+            <div class="form-grid">
+                <label>Tipo de serviço
+                    <select name="service_type" required>{% for s in service_types %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select>
+                </label>
+                <label>Prioridade
+                    <select name="priority">{% for p in activity_priorities %}<option value="{{ p }}" {% if p == 'Média' %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+                </label>
+            </div>
+            <label>Descrição da tarefa recorrente
+                <textarea name="description" rows="3" placeholder="Ex.: Fechamento fiscal mensal" required></textarea>
+            </label>
+            <div class="form-grid">
+                <label>Responsável padrão<input name="collaborator" value="{{ session.get('name') }}"></label>
+                <label>Modelo de checklist
+                    <select name="checklist_template_id">
+                        <option value="">Sem modelo</option>
+                        {% for template in checklist_templates %}
+                            <option value="{{ template.id }}">{{ template.name }}{% if template.service_type %} · {{ template.service_type }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="form-grid">
+                <label>Dia para criar a tarefa no mês<input type="number" name="activity_day" min="1" max="31" value="1" required></label>
+                <label>Dia do prazo no mês<input type="number" name="due_day" min="1" max="31" placeholder="Ex.: 10"></label>
+            </div>
+            <label>Observações padrão<textarea name="notes" rows="2" placeholder="Essas observações entram na ficha da atividade gerada."></textarea></label>
+            <button class="btn primary" type="submit">Salvar rotina mensal</button>
+        </form>
+    </section>
+
+    <section class="card generate-card">
+        <h2>Gerar atividades do mês</h2>
+        <p class="muted-text">Ao gerar, o sistema cria as atividades das rotinas ativas e aplica o checklist configurado. Se a rotina já foi gerada para o mesmo cliente no mesmo mês, ela não será duplicada.</p>
+        <form method="post" action="{{ url_for('recurring_tasks_generate') }}" class="compact-form">
+            <label>Mês<input type="month" name="month" value="{{ month }}" required></label>
+            <button class="btn primary" type="submit">Gerar rotinas do mês</button>
+        </form>
+        <div class="summary-box">
+            <span>Para conferir depois</span>
+            <strong>Abra o Kanban filtrado em {{ month_label(month) }}</strong>
+        </div>
+    </section>
+</div>
+
+<section class="template-list recurring-list">
+    {% for item in templates %}
+        <article class="card template-card recurring-template-card" id="rotina-{{ item.id }}">
+            <div class="section-title inline-title">
+                <div>
+                    <h2>{{ item.description }}</h2>
+                    <p class="muted-small">
+                        {{ item.client_name or 'Todos os clientes ativos' }} · {{ item.service_type }} ·
+                        {% if item.active %}<span class="badge">Ativa</span>{% else %}<span class="badge muted-badge">Inativa</span>{% endif %}
+                        {% if item.generated_in_month %}<span class="badge">{{ item.generated_in_month }} gerada(s) em {{ month_label(month) }}</span>{% endif %}
+                    </p>
+                </div>
+                <form method="post" action="{{ url_for('recurring_task_delete', template_id=item.id) }}" onsubmit="return confirm('Excluir esta rotina mensal? As atividades já geradas continuam salvas.');">
+                    <button class="btn small danger" type="submit">Excluir rotina</button>
+                </form>
+            </div>
+
+            <form method="post" action="{{ url_for('recurring_task_update', template_id=item.id) }}" class="compact-form template-edit-form recurring-edit-form">
+                <input type="hidden" name="month" value="{{ month }}">
+                <div class="form-grid">
+                    <label>Cliente
+                        <select name="client_id">
+                            <option value="" {% if not item.client_id %}selected{% endif %}>Todos os clientes ativos</option>
+                            {% for c in clients %}<option value="{{ c.id }}" {% if item.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label>Status
+                        <select name="active">
+                            <option value="1" {% if item.active %}selected{% endif %}>Ativa</option>
+                            <option value="0" {% if not item.active %}selected{% endif %}>Inativa</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="form-grid">
+                    <label>Tipo de serviço
+                        <select name="service_type" required>{% for s in service_types %}<option value="{{ s }}" {% if item.service_type == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+                    </label>
+                    <label>Prioridade
+                        <select name="priority">{% for p in activity_priorities %}<option value="{{ p }}" {% if (item.priority or 'Média') == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+                    </label>
+                </div>
+                <label>Descrição<textarea name="description" rows="2" required>{{ item.description }}</textarea></label>
+                <div class="form-grid">
+                    <label>Responsável padrão<input name="collaborator" value="{{ item.collaborator or '' }}"></label>
+                    <label>Modelo de checklist
+                        <select name="checklist_template_id">
+                            <option value="" {% if not item.checklist_template_id %}selected{% endif %}>Sem modelo</option>
+                            {% for template in checklist_templates %}
+                                <option value="{{ template.id }}" {% if item.checklist_template_id == template.id %}selected{% endif %}>{{ template.name }}{% if template.service_type %} · {{ template.service_type }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <div class="form-grid">
+                    <label>Dia para criar<input type="number" name="activity_day" min="1" max="31" value="{{ item.activity_day or 1 }}" required></label>
+                    <label>Dia do prazo<input type="number" name="due_day" min="1" max="31" value="{{ item.due_day or '' }}"></label>
+                </div>
+                <label>Observações<textarea name="notes" rows="2">{{ item.notes or '' }}</textarea></label>
+                <div class="actions-row">
+                    <button class="btn primary" type="submit">Salvar alterações</button>
+                    {% if item.generated_in_month %}<a class="btn" href="{{ url_for('activities', month=month) }}&status=&client_id={{ item.client_id or '' }}">Ver no Kanban</a>{% endif %}
+                </div>
+            </form>
+        </article>
+    {% else %}
+        <section class="card">
+            <h2>Nenhuma rotina cadastrada</h2>
+            <p>Cadastre a primeira rotina mensal para automatizar a criação das tarefas repetitivas do escritório.</p>
+        </section>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if session.get('user_id') %}
+<div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Recolher menu" title="Recolher menu">
+            <span class="toggle-icon">‹</span>
+        </button>
+        <div class="brand">
+            <div class="brand-mark" aria-hidden="true"><img src="{{ url_for('static', filename='logo_gestao360.png') }}" alt="Logo {{ app_name }}"></div>
+            <div class="brand-copy">
+                <strong>{{ app_name }}</strong>
+                <span>Gestão de clientes contábeis</span>
+            </div>
+        </div>
+        <nav>
+            <a href="{{ url_for('dashboard') }}" title="Dashboard"><span class="nav-icon">⌂</span><span class="nav-text">Dashboard</span></a>
+            <a href="{{ url_for('clients') }}" title="Clientes"><span class="nav-icon">◫</span><span class="nav-text">Clientes</span></a>
+            <a href="{{ url_for('activities') }}" title="Atividades / Serviços"><span class="nav-icon">✓</span><span class="nav-text">Atividades / Serviços</span></a>
+            {% if can_view_financial %}<a href="{{ url_for('receivables') }}" title="Contas a receber"><span class="nav-icon">R$</span><span class="nav-text">Contas a receber</span></a>{% endif %}
+            <a href="{{ url_for('monthly_report') }}" title="Relatório de atividades"><span class="nav-icon">▤</span><span class="nav-text">Relatório de atividades</span></a>
+            {% if can_view_financial %}<a href="{{ url_for('receipts_report') }}" title="Relatório de recebimentos"><span class="nav-icon">↓R$</span><span class="nav-text">Relatório de recebimentos</span></a>{% endif %}
+            {% if session.get('role') == 'Administrador' %}
+                <a href="{{ url_for('checklist_templates') }}" title="Modelos de checklist"><span class="nav-icon">☑</span><span class="nav-text">Modelos de checklist</span></a>
+                <a href="{{ url_for('recurring_tasks') }}" title="Rotinas mensais"><span class="nav-icon">↻</span><span class="nav-text">Rotinas mensais</span></a>
+                <a href="{{ url_for('backup_page') }}" title="Backup"><span class="nav-icon">⇩</span><span class="nav-text">Backup</span></a>
+                <a href="{{ url_for('audit_logs') }}" title="Histórico / Auditoria"><span class="nav-icon">≡</span><span class="nav-text">Histórico</span></a>
+                <a href="{{ url_for('users') }}" title="Usuários"><span class="nav-icon">👥</span><span class="nav-text">Usuários</span></a>
+                <a href="{{ url_for('settings') }}" title="Configurações"><span class="nav-icon">⚙</span><span class="nav-text">Configurações</span></a>
+            {% endif %}
+            <a href="{{ url_for('change_password') }}" title="Alterar senha"><span class="nav-icon">🔒</span><span class="nav-text">Alterar senha</span></a>
+            <a href="{{ url_for('logout') }}" title="Sair"><span class="nav-icon">↗</span><span class="nav-text">Sair</span></a>
+        </nav>
+        <div class="user-card" title="{{ session.get('name') }} - {{ session.get('role') }}">
+            <span class="user-label">Usuário logado</span>
+            <strong>{{ session.get('name') }}</strong>
+            <span>{{ session.get('role') }}</span>
+        </div>
+    </aside>
+    <main class="main">
+        {% if session.get('using_default_password') %}
+            <div class="alert error">Você está usando uma senha padrão ou fraca. Acesse <a href="{{ url_for('change_password') }}">Alterar senha</a> para proteger o sistema.</div>
+        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="alert {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+<script>
+(function () {
+    const shell = document.getElementById('appShell');
+    const button = document.getElementById('sidebarToggle');
+    if (!shell || !button) return;
+
+    const storageKey = 'gestao360SidebarCollapsed';
+    const isMobile = () => window.matchMedia('(max-width: 980px)').matches;
+
+    function applyState(collapsed) {
+        if (isMobile()) collapsed = false;
+        shell.classList.toggle('sidebar-collapsed', collapsed);
+        button.setAttribute('aria-expanded', String(!collapsed));
+        button.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Recolher menu');
+        button.setAttribute('title', collapsed ? 'Expandir menu' : 'Recolher menu');
+        button.querySelector('.toggle-icon').textContent = collapsed ? '›' : '‹';
+    }
+
+    applyState(localStorage.getItem(storageKey) === '1');
+
+    button.addEventListener('click', function () {
+        const collapsed = !shell.classList.contains('sidebar-collapsed');
+        localStorage.setItem(storageKey, collapsed ? '1' : '0');
+        applyState(collapsed);
+    });
+
+    window.addEventListener('resize', function () {
+        applyState(localStorage.getItem(storageKey) === '1');
+    });
+})();
+</script>
+{% else %}
+    {% block public_content %}{% endblock %}
+{% endif %}
+</body>
+</html>

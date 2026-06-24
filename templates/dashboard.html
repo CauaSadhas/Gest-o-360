@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Visão geral do escritório em {{ month_label(month) }}</p>
+    </div>
+    <form class="inline-form" method="get">
+        <input type="month" name="month" value="{{ month }}">
+        <button class="btn">Filtrar</button>
+    </form>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Clientes ativos</span><strong>{{ active_clients }}</strong></div>
+    {% if can_view_financial %}
+    <div class="card metric"><span>A receber no mês</span><strong>{{ money(total_to_receive) }}</strong></div>
+    <div class="card metric"><span>Recebido no mês</span><strong>{{ money(total_received) }}</strong></div>
+    <div class="card metric danger"><span>Em atraso</span><strong>{{ money(total_overdue) }}</strong></div>
+    {% endif %}
+    <div class="card metric"><span>Horas no mês</span><strong>{{ hours(hours_month) }}</strong></div>
+    <div class="card metric"><span>Mais horas</span><strong>{{ client_most_hours.name if client_most_hours else '-' }}</strong></div>
+    {% if can_view_financial %}
+    <div class="card metric success"><span>Mais lucrativo</span><strong>{{ most_profitable.name if most_profitable else '-' }}</strong></div>
+    <div class="card metric warning"><span>Baixa rentabilidade</span><strong>{{ risk_client.name if risk_client else '-' }}</strong></div>
+    {% endif %}
+</section>
+
+<div class="section-title dashboard-task-title">
+    <div>
+        <h2>Painel de tarefas</h2>
+        <p class="muted-small">Acompanhe o que está vencido, o que vence hoje e o que está parado aguardando cliente ou documentos.</p>
+    </div>
+    <a class="btn" href="{{ url_for('activities', month=month) }}">Abrir Kanban</a>
+</div>
+
+<section class="cards task-overview-cards">
+    <a class="card metric danger metric-link" href="{{ url_for('activities') }}">
+        <span>Tarefas vencidas</span><strong>{{ tasks_overdue_count }}</strong>
+    </a>
+    <a class="card metric warning metric-link" href="{{ url_for('activities') }}">
+        <span>Vencem hoje</span><strong>{{ tasks_due_today_count }}</strong>
+    </a>
+    <a class="card metric metric-link" href="{{ url_for('activities', status='Aguardando cliente') }}">
+        <span>Aguardando cliente/doc.</span><strong>{{ tasks_waiting_count }}</strong>
+    </a>
+    <a class="card metric warning metric-link" href="{{ url_for('activities', priority='Urgente') }}">
+        <span>Urgentes/altas abertas</span><strong>{{ high_priority_open_count }}</strong>
+    </a>
+    <a class="card metric metric-link" href="{{ url_for('activities', month=month) }}">
+        <span>Abertas no mês</span><strong>{{ task_open_month }}</strong>
+    </a>
+    <div class="card metric success">
+        <span>Concluídas no mês</span><strong>{{ task_completed_month }}/{{ task_total_month }}</strong>
+    </div>
+</section>
+
+<div class="grid three dashboard-task-grid">
+    <section class="card task-list-card">
+        <div class="inline-title">
+            <div>
+                <h2>Vencidas</h2>
+                <p class="muted-small">Tarefas abertas com prazo anterior a {{ today|datebr }}.</p>
+            </div>
+            <span class="badge danger-badge">{{ tasks_overdue_count }}</span>
+        </div>
+        <div class="compact-task-list">
+            {% for a in overdue_activities %}
+            <a class="task-mini-row overdue" href="{{ url_for('activity_detail', activity_id=a.id) }}">
+                <strong>{{ a.description }}</strong>
+                <span>{{ a.client_name }} · {{ a.priority or 'Média' }}</span>
+                <small>Prazo: {{ a.due_date|datebr }} · {{ a.status }}</small>
+            </a>
+            {% else %}<p class="empty">Nenhuma tarefa vencida.</p>{% endfor %}
+        </div>
+    </section>
+
+    <section class="card task-list-card">
+        <div class="inline-title">
+            <div>
+                <h2>Para hoje</h2>
+                <p class="muted-small">Tarefas abertas com prazo em {{ today|datebr }}.</p>
+            </div>
+            <span class="badge warning-badge">{{ tasks_due_today_count }}</span>
+        </div>
+        <div class="compact-task-list">
+            {% for a in today_activities %}
+            <a class="task-mini-row today" href="{{ url_for('activity_detail', activity_id=a.id) }}">
+                <strong>{{ a.description }}</strong>
+                <span>{{ a.client_name }} · {{ a.priority or 'Média' }}</span>
+                <small>{{ a.service_type }} · {{ a.status }}</small>
+            </a>
+            {% else %}<p class="empty">Nenhuma tarefa vencendo hoje.</p>{% endfor %}
+        </div>
+    </section>
+
+    <section class="card task-list-card">
+        <div class="inline-title">
+            <div>
+                <h2>Aguardando</h2>
+                <p class="muted-small">Itens parados por retorno do cliente ou documentos.</p>
+            </div>
+            <span class="badge">{{ tasks_waiting_count }}</span>
+        </div>
+        <div class="compact-task-list">
+            {% for a in waiting_activities %}
+            <a class="task-mini-row waiting" href="{{ url_for('activity_detail', activity_id=a.id) }}">
+                <strong>{{ a.description }}</strong>
+                <span>{{ a.client_name }} · {{ a.status }}</span>
+                <small>Prazo: {{ a.due_date|datebr if a.due_date else '-' }} · {{ a.priority or 'Média' }}</small>
+            </a>
+            {% else %}<p class="empty">Nada aguardando cliente/documentos.</p>{% endfor %}
+        </div>
+    </section>
+</div>
+
+<div class="grid three dashboard-task-grid">
+    <section class="card">
+        <h2>Status das tarefas no mês</h2>
+        <div class="status-grid task-status-grid">
+            {% for status, qty in task_status_counts.items() %}
+            <div class="status-item"><span>{{ status }}</span><strong>{{ qty }}</strong></div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Prioridades no mês</h2>
+        <div class="status-grid task-status-grid">
+            {% for priority, qty in task_priority_counts.items() %}
+            <div class="status-item"><span>{{ priority }}</span><strong>{{ qty }}</strong></div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Ranking por responsável</h2>
+        <table class="compact-table">
+            <thead><tr><th>Responsável</th><th>Abertas</th><th>Vencidas</th><th>Horas</th></tr></thead>
+            <tbody>
+            {% for item in collaborator_ranking %}
+                <tr>
+                    <td>{{ item.collaborator_name }}</td>
+                    <td>{{ item.open_tasks }}</td>
+                    <td>{{ item.overdue_tasks }}</td>
+                    <td>{{ hours(item.total_hours) }}</td>
+                </tr>
+            {% else %}<tr><td colspan="4">Sem dados de responsáveis no mês.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+
+<div class="grid two">
+    <section class="card">
+        <h2>Gráfico de horas por cliente</h2>
+        <div class="bar-list">
+            {% for item in chart_hours %}
+            <div class="bar-row">
+                <span>{{ item.name }}</span>
+                <div class="bar-track"><div class="bar" style="width: {{ (item.total_hours / (chart_hours[0].total_hours or 1) * 100)|round(0) }}%"></div></div>
+                <strong>{{ hours(item.total_hours) }}</strong>
+            </div>
+            {% else %}<p class="empty">Nenhuma atividade lançada no mês.</p>{% endfor %}
+        </div>
+    </section>
+
+    {% if can_view_financial %}
+    <section class="card">
+        <h2>Contas a receber por status</h2>
+        <div class="status-grid">
+            {% for status, qty in status_counts.items() %}
+            <div class="status-item"><span>{{ status }}</span><strong>{{ qty }}</strong></div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<div class="grid two">
+    <section class="card">
+        <h2>Ranking por tempo gasto</h2>
+        <table>
+            <thead><tr><th>Cliente</th><th>Horas</th><th>Rentabilidade</th></tr></thead>
+            <tbody>
+            {% for item in ranking_hours %}
+                <tr><td>{{ item.name }}</td><td>{{ hours(item.total_hours) }}</td><td><span class="badge">{{ item.rentability }}</span></td></tr>
+            {% else %}<tr><td colspan="3">Sem dados.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    {% if can_view_financial %}
+    <section class="card">
+        <h2>Ranking por valor recebido</h2>
+        <table>
+            <thead><tr><th>Cliente</th><th>Recebido</th><th>Valor/hora</th></tr></thead>
+            <tbody>
+            {% for item in ranking_received %}
+                <tr><td>{{ item.name }}</td><td>{{ money(item.received_amount) }}</td><td>{{ money(item.value_per_hour) if item.value_per_hour else '-' }}</td></tr>
+            {% else %}<tr><td colspan="3">Sem dados.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

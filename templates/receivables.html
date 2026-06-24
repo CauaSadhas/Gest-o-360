@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div><h1>Contas a receber</h1><p>Controle cobranças, recebimentos, atrasos, parcelas, baixas parciais e pendências que continuam aparecendo até a baixa.</p></div>
+    <div class="actions-row"><a class="btn" href="{{ url_for('receipts_report', month=month) }}">Relatório de recebimentos</a></div>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Total em aberto até o mês</span><strong>{{ money(totals.to_receive) }}</strong></div>
+    <div class="card metric success"><span>Total recebido no mês</span><strong>{{ money(totals.received) }}</strong></div>
+    <div class="card metric danger"><span>Total em atraso</span><strong>{{ money(totals.overdue) }}</strong></div>
+    <div class="card metric warning"><span>Clientes inadimplentes</span><strong>{{ inadimplentes|length }}</strong></div>
+</section>
+
+<div class="grid two top-align">
+    <section class="card">
+        <h2>Nova cobrança</h2>
+        <form method="post" class="compact-form">
+            <label>Cliente<select name="client_id" required>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+            <label>Descrição da cobrança<input name="description" required placeholder="Mensalidade contábil"></label>
+            <label>Valor da parcela<input name="amount" type="text" class="money-mask" inputmode="decimal" required placeholder="R$ 0,00"></label>
+            <label>Quantidade de parcelas<input name="installments" type="number" min="1" value="1" required placeholder="Ex.: 3"></label>
+            <label>Data do primeiro vencimento<input name="due_date" type="date" value="{{ today }}" required></label>
+            <label>Data de pagamento<input name="payment_date" type="date"></label>
+            <label>Status<select name="status"><option>A receber</option><option>Pago</option></select></label>
+            <label>Forma de pagamento<select name="payment_method"><option value=""></option>{% for p in payment_methods %}<option>{{ p }}</option>{% endfor %}</select></label>
+            <label>Observações<textarea name="notes" rows="2"></textarea></label>
+            <button class="btn primary" type="submit">Salvar cobrança</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Filtros e previsão</h2>
+        <form class="compact-form" method="get">
+            <label>Mês<input type="month" name="month" value="{{ month }}"></label>
+            <label>Cliente<select name="client_id"><option value="">Todos</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+            <label>Status<select name="status"><option value="">Todos</option>{% for s in statuses %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+            <label>Parcelamento
+                <select name="installment_filter">
+                    <option value="" {% if not installment_filter %}selected{% endif %}>Todos</option>
+                    <option value="parcelado" {% if installment_filter == 'parcelado' %}selected{% endif %}>Parcelado</option>
+                    <option value="avista" {% if installment_filter == 'avista' %}selected{% endif %}>À vista</option>
+                </select>
+            </label>
+            <label>Ordenar
+                <select name="sort">
+                    <option value="due_date" {% if sort == 'due_date' %}selected{% endif %}>Vencimento</option>
+                    <option value="client_az" {% if sort == 'client_az' %}selected{% endif %}>Cliente A-Z</option>
+                    <option value="client_za" {% if sort == 'client_za' %}selected{% endif %}>Cliente Z-A</option>
+                    <option value="status" {% if sort == 'status' %}selected{% endif %}>Status</option>
+                    <option value="valor_maior" {% if sort == 'valor_maior' %}selected{% endif %}>Maior valor</option>
+                    <option value="valor_menor" {% if sort == 'valor_menor' %}selected{% endif %}>Menor valor</option>
+                </select>
+            </label>
+            <button class="btn">Filtrar</button>
+        </form>
+        <div class="mini-list">
+            <h3>Previsão de saldo a receber por mês</h3>
+            {% for m, total in forecast.items() %}<p><span>{{ month_label(m) }}</span><strong>{{ money(total) }}</strong></p>{% else %}<p>Sem previsão.</p>{% endfor %}
+        </div>
+        <div class="mini-list danger-text">
+            <h3>Clientes inadimplentes</h3>
+            {% for name, total in inadimplentes.items() %}<p><span>{{ name }}</span><strong>{{ money(total) }}</strong></p>{% else %}<p>Nenhum cliente inadimplente no filtro.</p>{% endfor %}
+        </div>
+    </section>
+</div>
+
+<section class="card">
+    <div class="section-title">
+        <div>
+            <h2>Cobranças</h2>
+            <p class="muted-small">Agora a tabela mostra valor original, valor já baixado e saldo restante. Cobranças vencidas não baixadas continuam aparecendo nos meses seguintes.</p>
+        </div>
+    </div>
+    <form class="filters table-filterbar" method="get">
+        <label>Mês<input type="month" name="month" value="{{ month }}"></label>
+        <label>Cliente
+            <select name="client_id">
+                <option value="">Todos</option>
+                {% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Status
+            <select name="status">
+                <option value="">Todos</option>
+                {% for s in statuses %}<option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Parcelamento
+            <select name="installment_filter">
+                <option value="" {% if not installment_filter %}selected{% endif %}>Todos</option>
+                <option value="parcelado" {% if installment_filter == 'parcelado' %}selected{% endif %}>Parcelado</option>
+                <option value="avista" {% if installment_filter == 'avista' %}selected{% endif %}>À vista</option>
+            </select>
+        </label>
+        <label>Ordenar
+            <select name="sort">
+                <option value="due_date" {% if sort == 'due_date' %}selected{% endif %}>Vencimento</option>
+                <option value="client_az" {% if sort == 'client_az' %}selected{% endif %}>Cliente A-Z</option>
+                <option value="client_za" {% if sort == 'client_za' %}selected{% endif %}>Cliente Z-A</option>
+                <option value="status" {% if sort == 'status' %}selected{% endif %}>Status</option>
+                <option value="valor_maior" {% if sort == 'valor_maior' %}selected{% endif %}>Maior valor</option>
+                <option value="valor_menor" {% if sort == 'valor_menor' %}selected{% endif %}>Menor valor</option>
+            </select>
+        </label>
+        <button class="btn primary" type="submit">Aplicar filtros</button>
+        <a class="btn" href="{{ url_for('receivables') }}">Limpar</a>
+    </form>
+    <table>
+        <thead><tr><th>Cliente</th><th>Descrição</th><th>Parcela</th><th>Valor</th><th>Pago</th><th>Saldo</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Forma</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for r in receivables %}
+        <tr>
+            <td><a href="{{ url_for('client_detail', client_id=r.client_id) }}">{{ r.client_name }}</a></td>
+            <td>{{ r.description }}</td>
+            <td>{% if (r.installment_total or 1) > 1 %}<span class="badge">{{ r.installment_number }}/{{ r.installment_total }}</span>{% else %}<span class="badge">À vista</span>{% endif %}</td>
+            <td>{{ money(r.amount) }}</td>
+            <td>{{ money(receivable_paid_amount(r)) }}</td>
+            <td><strong>{{ money(receivable_remaining_amount(r)) }}</strong></td>
+            <td>{{ r.due_date|datebr }}</td>
+            <td>{{ r.payment_date|datebr }}</td>
+            <td><span class="badge">{{ computed_receivable_status(r) }}</span></td>
+            <td>{{ r.payment_method or '-' }}</td>
+            <td>
+                <div class="actions-row">
+                    <a class="btn small" href="{{ url_for('receivable_detail', receivable_id=r.id) }}">Abrir ficha</a>
+                    {% if can_receive_payment(r) %}
+                    <form method="post" action="{{ url_for('mark_paid', receivable_id=r.id) }}">
+                        <input type="hidden" name="payment_date" value="{{ today }}">
+                        <button class="btn small" type="submit">Baixar saldo</button>
+                    </form>
+                    {% endif %}
+                    {% if session.get('role') == 'Administrador' and has_receivable_payment(r) %}
+                    <form method="post" action="{{ url_for('receivable_undo_payment', receivable_id=r.id) }}" onsubmit="return confirm('Desfazer todas as baixas desta parcela e voltar para em aberto?');">
+                        <button class="btn small warning" type="submit">Desfazer baixa</button>
+                    </form>
+                    {% endif %}
+                    {% if session.get('role') == 'Administrador' and can_cancel_receivable(r) %}
+                    <form method="post" action="{{ url_for('receivable_cancel', receivable_id=r.id) }}" onsubmit="return confirm('Cancelar esta parcela? Ela ficará no histórico, mas sairá do saldo em aberto.');">
+                        <button class="btn small warning" type="submit">Cancelar</button>
+                    </form>
+                    <form method="post" action="{{ url_for('receivable_delete', receivable_id=r.id) }}" onsubmit="return confirm('Excluir esta parcela gerada indevidamente? Essa ação não pode ser desfeita.');">
+                        <button class="btn small danger" type="submit">Excluir</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% else %}<tr><td colspan="11">Nenhuma cobrança encontrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+(function () {
+    function formatBRL(value) {
+        const cents = String(value || '').replace(/\D/g, '');
+        const number = (parseInt(cents || '0', 10) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return number;
+    }
+    document.querySelectorAll('.money-mask').forEach(function(input) {
+        input.addEventListener('input', function() { input.value = formatBRL(input.value); });
+        input.addEventListener('blur', function() { if (input.value) input.value = formatBRL(input.value); });
+    });
+})();
+</script>
+{% endblock %}

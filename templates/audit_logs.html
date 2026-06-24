@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Histórico / Auditoria</h1>
+        <p>Acompanhe ações importantes realizadas no sistema: clientes, tarefas, cobranças, backups, usuários e configurações.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('audit_logs') }}">Limpar filtros</a>
+    </div>
+</div>
+
+<div class="cards">
+    <div class="card metric">
+        <span>Total registrado</span>
+        <strong>{{ total_logs }}</strong>
+    </div>
+    <div class="card metric">
+        <span>Mostrando na tela</span>
+        <strong>{{ logs|length }}</strong>
+    </div>
+    <div class="card metric success">
+        <span>Usuários com ação</span>
+        <strong>{{ users_list|length }}</strong>
+    </div>
+    <div class="card metric warning">
+        <span>Tipos de origem</span>
+        <strong>{{ entity_types|length }}</strong>
+    </div>
+</div>
+
+<div class="card audit-toolbar">
+    <h2>Filtros</h2>
+    <form method="get" class="audit-filters">
+        <label>Ação
+            <select name="action">
+                <option value="">Todas</option>
+                {% for item in actions %}
+                    <option value="{{ item.action }}" {% if filters.action == item.action %}selected{% endif %}>{{ item.action }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Origem
+            <select name="entity_type">
+                <option value="">Todas</option>
+                {% for item in entity_types %}
+                    <option value="{{ item.entity_type }}" {% if filters.entity_type == item.entity_type %}selected{% endif %}>{{ item.entity_type }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Usuário
+            <select name="user_name">
+                <option value="">Todos</option>
+                {% for item in users_list %}
+                    <option value="{{ item.user_name }}" {% if filters.user_name == item.user_name %}selected{% endif %}>{{ item.user_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Data inicial
+            <input type="date" name="start_date" value="{{ filters.start_date }}">
+        </label>
+        <label>Data final
+            <input type="date" name="end_date" value="{{ filters.end_date }}">
+        </label>
+        <label class="wide">Buscar por texto
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="Cliente, cobrança, detalhe, ação...">
+        </label>
+        <button class="btn primary" type="submit">Filtrar histórico</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="section-title">
+        <h2>Últimos registros</h2>
+        <span class="badge">Limite: 300 registros</span>
+    </div>
+    {% if logs %}
+        <table class="audit-log-table">
+            <thead>
+                <tr>
+                    <th>Data/hora</th>
+                    <th>Usuário</th>
+                    <th>Ação</th>
+                    <th>Origem</th>
+                    <th>Registro</th>
+                    <th>Detalhes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.created_at|datetimebr }}</td>
+                        <td>
+                            <div class="audit-user">
+                                <strong>{{ log.user_name or 'Sistema' }}</strong>
+                                {% if log.ip_address %}<small>IP: {{ log.ip_address }}</small>{% endif %}
+                            </div>
+                        </td>
+                        <td><span class="audit-action">{{ log.action }}</span></td>
+                        <td><span class="badge">{{ log.entity_type }}</span></td>
+                        <td>
+                            <strong>{{ log.entity_label or '-' }}</strong>
+                            {% if log.entity_id %}<br><small class="muted">ID interno: {{ log.entity_id }}</small>{% endif %}
+                        </td>
+                        <td><div class="audit-details">{{ log.details or '-' }}</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="empty">Nenhum registro encontrado para os filtros selecionados.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Modelos de checklist</h1>
+        <p>Crie checklists reutilizáveis para aplicar nas atividades, igual aos modelos do Trello.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('activities') }}">Voltar para atividades</a>
+    </div>
+</div>
+
+<div class="grid two top-align">
+    <section class="card">
+        <h2>Novo modelo</h2>
+        <form method="post" action="{{ url_for('checklist_templates') }}" class="compact-form">
+            <label>Nome do modelo
+                <input name="name" placeholder="Ex.: Fechamento Fiscal Mensal" required>
+            </label>
+            <label>Tipo de serviço vinculado
+                <select name="service_type">
+                    <option value="">Geral / qualquer serviço</option>
+                    {% for s in service_types %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                </select>
+            </label>
+            <label>Descrição
+                <textarea name="description" rows="3" placeholder="Explique quando esse checklist deve ser usado."></textarea>
+            </label>
+            <label>Itens iniciais, um por linha
+                <textarea name="items_text" rows="8" placeholder="Conferir documentos recebidos&#10;Lançar informações no sistema&#10;Revisar pendências&#10;Enviar retorno ao cliente"></textarea>
+            </label>
+            <button class="btn primary" type="submit">Criar modelo</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Como usar</h2>
+        <div class="info-list">
+            <p><span>1.</span><strong>Cadastre um modelo com os passos que você usa sempre.</strong></p>
+            <p><span>2.</span><strong>Abra uma atividade e escolha o modelo na área do checklist.</strong></p>
+            <p><span>3.</span><strong>O sistema adiciona os itens sem duplicar o que já existe.</strong></p>
+        </div>
+        <div class="summary-box">
+            <span>Total de modelos cadastrados</span>
+            <strong>{{ templates|length }}</strong>
+        </div>
+    </section>
+</div>
+
+<section class="template-list">
+    {% for template in templates %}
+    <article class="card template-card" id="modelo-{{ template.id }}">
+        <div class="section-title inline-title">
+            <div>
+                <h2>{{ template.name }}</h2>
+                <p class="muted-small">
+                    {{ template.service_type or 'Geral / qualquer serviço' }} · {{ template.items_count }} item(ns)
+                    {% if not template.active %} · Inativo{% endif %}
+                </p>
+            </div>
+            <form method="post" action="{{ url_for('checklist_template_delete', template_id=template.id) }}" onsubmit="return confirm('Excluir este modelo de checklist? Os checklists já aplicados em atividades não serão apagados.');">
+                <button class="btn small danger" type="submit">Excluir modelo</button>
+            </form>
+        </div>
+
+        <form method="post" action="{{ url_for('checklist_template_update', template_id=template.id) }}" class="compact-form template-edit-form">
+            <div class="form-grid">
+                <label>Nome
+                    <input name="name" value="{{ template.name }}" required>
+                </label>
+                <label>Tipo de serviço
+                    <select name="service_type">
+                        <option value="">Geral / qualquer serviço</option>
+                        {% for s in service_types %}<option value="{{ s }}" {% if template.service_type == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+            <label>Descrição
+                <textarea name="description" rows="2">{{ template.description or '' }}</textarea>
+            </label>
+            <label class="check-row">
+                <input type="checkbox" name="active" value="1" {% if template.active %}checked{% endif %}>
+                Modelo ativo para aplicar em atividades
+            </label>
+            <div class="actions-row">
+                <button class="btn small primary" type="submit">Salvar modelo</button>
+            </div>
+        </form>
+
+        <div class="template-items-box">
+            <h3>Itens do modelo</h3>
+            <form method="post" action="{{ url_for('checklist_template_item_add', template_id=template.id) }}" class="checklist-add-form">
+                <input name="title" placeholder="Adicionar novo item ao modelo" required>
+                <button class="btn primary" type="submit">+ Adicionar item</button>
+            </form>
+            <div class="checklist-list">
+                {% for item in template_items.get(template.id, []) %}
+                <div class="template-item-row">
+                    <form method="post" action="{{ url_for('checklist_template_item_edit', item_id=item.id) }}" class="checklist-edit-form">
+                        <input name="title" value="{{ item.title }}" aria-label="Editar item do modelo">
+                        <button class="btn small" type="submit">Salvar</button>
+                    </form>
+                    <form method="post" action="{{ url_for('checklist_template_item_delete', item_id=item.id) }}" onsubmit="return confirm('Excluir este item do modelo?');">
+                        <button class="btn small danger" type="submit">Excluir</button>
+                    </form>
+                </div>
+                {% else %}
+                <p class="empty">Este modelo ainda não tem itens. Adicione os passos acima.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </article>
+    {% else %}
+    <section class="card">
+        <p class="empty">Nenhum modelo cadastrado ainda. Crie o primeiro modelo acima.</p>
+    </section>
+    {% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Backup</h1>
+        <p>Gere cópias de segurança do banco e dos anexos do sistema.</p>
+    </div>
+</div>
+
+{% if remote_database %}
+<section class="card">
+    <h2>Banco de dados em nuvem</h2>
+    <p>Esta instalação está conectada ao Turso. Os backups e a recuperação do banco devem ser administrados no painel do provedor.</p>
+    <p class="muted">O backup local em arquivo <strong>.db</strong> fica desativado porque a aplicação não está usando um banco armazenado neste servidor.</p>
+</section>
+{% else %}
+<div class="grid two top-align">
+    <section class="card">
+        <h2>Backup do banco de dados</h2>
+        <p>Gera uma cópia do arquivo <strong>gestao360.db</strong>, com clientes, atividades, cobranças, checklist, usuários e configurações.</p>
+        <form method="post" action="{{ url_for('backup_database_create') }}" class="actions-row">
+            <button class="btn primary" type="submit">Gerar backup do banco</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Backup completo</h2>
+        <p>Gera um arquivo <strong>.zip</strong> com o banco de dados e os anexos enviados nas atividades.</p>
+        <form method="post" action="{{ url_for('backup_full_create') }}" class="actions-row">
+            <button class="btn primary" type="submit">Gerar backup completo</button>
+        </form>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Recomendação de segurança</h2>
+    <p>Faça backup antes de excluir clientes, cobranças, anexos ou qualquer informação importante. Guarde uma cópia fora do computador principal, como pendrive, HD externo ou nuvem.</p>
+</section>
+
+<section class="card">
+    <h2>Backups gerados</h2>
+    {% if backups %}
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Arquivo</th>
+                        <th>Tipo</th>
+                        <th>Tamanho</th>
+                        <th>Gerado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in backups %}
+                        <tr>
+                            <td><strong>{{ item.filename }}</strong></td>
+                            <td><span class="badge">{{ item.kind }}</span></td>
+                            <td>{{ item.size_label }}</td>
+                            <td>{{ item.created_at|datetimebr }}</td>
+                            <td>
+                                <div class="actions-row">
+                                    <a class="btn small" href="{{ url_for('backup_download', filename=item.filename) }}">Baixar</a>
+                                    <form method="post" action="{{ url_for('backup_delete', filename=item.filename) }}" onsubmit="return confirm('Excluir este backup? Baixe uma cópia antes se ainda precisar dele.');">
+                                        <button class="btn small danger" type="submit">Excluir</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted">Nenhum backup gerado ainda.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

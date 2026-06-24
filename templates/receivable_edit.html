@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Editar cobrança</h1>
+        <p>{{ receivable.client_name }} • {{ receivable.description }}</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('receivable_detail', receivable_id=receivable.id) }}">Voltar para ficha</a>
+        <a class="btn" href="{{ url_for('receivables') }}">Contas a receber</a>
+    </div>
+</div>
+
+<section class="cards">
+    <div class="card metric"><span>Total atual da cobrança</span><strong>{{ money(total_amount) }}</strong></div>
+    <div class="card metric success"><span>Total já baixado</span><strong>{{ money(paid_amount) }}</strong></div>
+    <div class="card metric"><span>Quantidade atual</span><strong>{{ installments|length }} parcela(s)</strong></div>
+    <div class="card metric warning"><span>Regra de segurança</span><strong>Preserva pagas</strong></div>
+</section>
+
+<div class="grid two top-align">
+    <form class="card compact-form" method="post">
+        <h2>Dados da cobrança</h2>
+        <label>Cliente
+            <select name="client_id" required>
+                {% for c in clients %}<option value="{{ c.id }}" {% if c.id == receivable.client_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Descrição da cobrança
+            <input name="description" value="{{ receivable.description }}" required>
+        </label>
+        <label>Valor total da cobrança
+            <input name="total_amount" type="text" class="money-mask" inputmode="decimal" value="{{ money(total_amount) }}" required>
+        </label>
+        <label>Quantidade de parcelas
+            <input name="installment_total" type="number" min="1" value="{{ receivable.installment_total or installments|length or 1 }}" required>
+        </label>
+        <label>Data do primeiro vencimento
+            <input name="first_due_date" type="date" value="{{ first_due }}" required>
+        </label>
+        <label>Forma de pagamento padrão das parcelas em aberto
+            <select name="payment_method">
+                <option value=""></option>
+                {% for p in payment_methods %}<option value="{{ p }}" {% if receivable.payment_method == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Observações
+            <textarea name="notes" rows="3">{{ receivable.notes or '' }}</textarea>
+        </label>
+        <button class="btn primary" type="submit">Salvar alterações e recalcular parcelas</button>
+    </form>
+
+    <section class="card">
+        <h2>Como o sistema vai atualizar</h2>
+        <div class="info-list">
+            <p><span>Parcelas com baixa</span><strong>Serão preservadas</strong></p>
+            <p><span>Parcelas sem baixa</span><strong>Serão recalculadas</strong></p>
+            <p><span>Baixas parciais</span><strong>Não serão apagadas</strong></p>
+            <p><span>Vencimentos</span><strong>Serão gerados mensalmente</strong></p>
+        </div>
+        <p class="muted-small">Se alguma parcela já recebeu baixa total ou parcial, o sistema preserva a parcela e o histórico de pagamento. Ele recalcula somente as parcelas sem baixa.</p>
+    </section>
+</div>
+
+<section class="card">
+    <h2>Parcelas atuais</h2>
+    <table>
+        <thead><tr><th>Parcela</th><th>Valor</th><th>Pago</th><th>Saldo</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Forma</th></tr></thead>
+        <tbody>
+        {% for r in installments %}
+        <tr>
+            <td><span class="badge">{{ r.installment_number }}/{{ r.installment_total }}</span></td>
+            <td>{{ money(r.amount) }}</td>
+            <td>{{ money(receivable_paid_amount(r)) }}</td>
+            <td><strong>{{ money(receivable_remaining_amount(r)) }}</strong></td>
+            <td>{{ r.due_date|datebr }}</td>
+            <td>{{ r.payment_date|datebr }}</td>
+            <td><span class="badge">{{ computed_receivable_status(r) }}</span></td>
+            <td>{{ r.payment_method or '-' }}</td>
+        </tr>
+        {% else %}<tr><td colspan="8">Nenhuma parcela encontrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+(function () {
+    function formatBRL(value) {
+        const cents = String(value || '').replace(/\D/g, '');
+        return (parseInt(cents || '0', 10) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    document.querySelectorAll('.money-mask').forEach(function(input) {
+        input.addEventListener('input', function() { input.value = formatBRL(input.value); });
+        input.addEventListener('blur', function() { if (input.value) input.value = formatBRL(input.value); });
+    });
+})();
+</script>
+{% endblock %}

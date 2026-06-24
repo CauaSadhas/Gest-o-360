@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block public_content %}
+<div class="login-page landing-login">
+    {% include "_auth_hero.html" %}
+
+    <section class="login-card-wrap">
+        <form class="login-card auth-card-tall" method="post" autocomplete="on">
+            <div>
+                <span class="form-kicker">CONFIGURAÇÃO INICIAL</span>
+                <h2>Crie a conta administradora</h2>
+                <p>Não existe mais login padrão. Esta será a primeira conta responsável pelo sistema.</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}
+                {% endif %}
+            {% endwith %}
+            <label>Nome do administrador
+                <input name="name" value="{{ request.form.get('name', '') }}" autocomplete="name" required autofocus>
+            </label>
+            <label>E-mail profissional
+                <input name="email" type="email" value="{{ request.form.get('email', '') }}" placeholder="seu@email.com.br" autocomplete="email" required>
+            </label>
+            <label>Senha
+                <input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres, com letra e número" required>
+            </label>
+            <label>Confirmar senha
+                <input name="password_confirmation" type="password" minlength="8" autocomplete="new-password" required>
+            </label>
+            <label>Código do escritório
+                <input name="registration_code" type="password" minlength="6" autocomplete="off" placeholder="Use para autorizar novos cadastros" required>
+            </label>
+            <button class="btn primary login-submit" type="submit">Configurar sistema</button>
+            <p class="auth-note">Guarde o código do escritório. Somente pessoas que souberem esse código poderão criar uma conta.</p>
+        </form>
+    </section>
+</div>
+{% endblock %}

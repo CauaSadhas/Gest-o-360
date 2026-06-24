@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ client.name }}</h1>
+        <p>{{ client.client_type or '-' }} · {{ client.document or 'Sem CPF/CNPJ' }} · <span class="badge">{{ client.status }}</span></p>
+    </div>
+    <div class="actions-row">
+        {% if session.get('role') == 'Administrador' %}<a class="btn" href="{{ url_for('client_edit', client_id=client.id) }}">Editar</a>{% endif %}
+        <a class="btn" href="{{ url_for('clients') }}">Voltar</a>
+    </div>
+</div>
+
+<section class="cards">
+    {% if can_view_financial %}<div class="card metric"><span>Valor mensal</span><strong>{{ money(client.monthly_fee) }}</strong></div>{% endif %}
+    <div class="card metric"><span>Horas no mês</span><strong>{{ hours(monthly_hours) }}</strong></div>
+    <div class="card metric"><span>Atividades no mês</span><strong>{{ activity_count }}</strong></div>
+    {% if can_view_financial %}
+    <div class="card metric"><span>Valor por hora</span><strong>{{ money(value_per_hour) if value_per_hour else '-' }}</strong></div>
+    <div class="card metric"><span>Rentabilidade</span><strong>{{ rentability }}</strong></div>
+    <div class="card metric danger"><span>Em atraso</span><strong>{{ money(overdue) }}</strong></div>
+    {% endif %}
+</section>
+
+<div class="grid two">
+    <section class="card">
+        <h2>Dados do cliente</h2>
+        <div class="detail-list">
+            <p><strong>Telefone:</strong> {{ client.phone or '-' }}</p>
+            <p><strong>E-mail:</strong> {{ client.email or '-' }}</p>
+            <p><strong>Responsável:</strong> {{ client.responsible or '-' }}</p>
+            <p><strong>Observações:</strong> {{ client.notes or '-' }}</p>
+        </div>
+    </section>
+    <section class="card">
+        <h2>Registrar atividade rápida</h2>
+        <form method="post" action="{{ url_for('activities') }}" class="compact-form">
+            <input type="hidden" name="client_id" value="{{ client.id }}">
+            <label>Data<input type="date" name="activity_date" value="{{ today }}" required></label>
+            <label>Tipo<select name="service_type">{% for s in service_types %}<option>{{ s }}</option>{% endfor %}</select></label>
+            <label>Descrição<textarea name="description" rows="3" required></textarea></label>
+            <label>Colaborador<input name="collaborator" value="{{ session.get('name') }}"></label>
+
+            <div class="timer-field">
+                <span class="timer-label">Tempo gasto na atividade</span>
+                <input type="hidden" name="time_spent" class="timer-hours-input" value="0" required>
+                <div class="timer-widget" data-initial-seconds="0">
+                    <div class="timer-display" aria-live="polite">00:00:00</div>
+                    <div class="timer-buttons">
+                        <button class="btn primary timer-start" type="button">▶ Iniciar</button>
+                        <button class="btn timer-pause" type="button" disabled>⏸ Pausar</button>
+                        <button class="btn timer-reset" type="button">↺ Zerar</button>
+                    </div>
+                    <small>Ao salvar, o tempo do cronômetro será convertido automaticamente em horas.</small>
+                </div>
+            </div>
+
+            <label>Status<select name="status">{% for s in activity_statuses %}<option>{{ s }}</option>{% endfor %}</select></label>
+            <label>Observações<textarea name="notes" rows="2"></textarea></label>
+            <button class="btn primary" type="submit">Salvar atividade</button>
+        </form>
+    </section>
+</div>
+
+<section class="card">
+    <div class="section-title"><h2>Serviços / Atividades do Cliente</h2><a class="btn small" href="{{ url_for('activities', client_id=client.id) }}">Ver todas</a></div>
+    <table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Colaborador</th><th>Tempo</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for a in activities %}
+        <tr><td>{{ a.activity_date|datebr }}</td><td>{{ a.service_type }}</td><td>{{ a.description }}</td><td>{{ a.collaborator or '-' }}</td><td>{{ hours(a.time_spent) }}</td><td><span class="badge">{{ a.status }}</span></td><td><a class="btn small" href="{{ url_for('activity_detail', activity_id=a.id) }}">Abrir ficha</a></td></tr>
+        {% else %}<tr><td colspan="7">Nenhuma atividade cadastrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% if can_view_financial %}
+<section class="card">
+    <div class="section-title"><h2>Contas a receber do cliente</h2><a class="btn small" href="{{ url_for('receivables', client_id=client.id) }}">Ver financeiro</a></div>
+    <table>
+        <thead><tr><th>Vencimento</th><th>Descrição</th><th>Parcela</th><th>Valor</th><th>Pago</th><th>Saldo</th><th>Status</th><th>Pagamento</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for r in receivables %}
+        <tr><td>{{ r.due_date|datebr }}</td><td>{{ r.description }}</td><td>{% if (r.installment_total or 1) > 1 %}<span class="badge">{{ r.installment_number }}/{{ r.installment_total }}</span>{% else %}<span class="badge">À vista</span>{% endif %}</td><td>{{ money(r.amount) }}</td><td>{{ money(receivable_paid_amount(r)) }}</td><td><strong>{{ money(receivable_remaining_amount(r)) }}</strong></td><td><span class="badge">{{ computed_receivable_status(r) }}</span></td><td>{{ r.payment_date|datebr }}</td><td><a class="btn small" href="{{ url_for('receivable_detail', receivable_id=r.id) }}">Abrir ficha</a></td></tr>
+        {% else %}<tr><td colspan="9">Nenhuma cobrança cadastrada.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<script>
+(function () {
+    function formatTime(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function updateHidden(widget, totalSeconds) {
+        const form = widget.closest('form');
+        const input = form ? form.querySelector('.timer-hours-input') : null;
+        if (input) {
+            input.value = (totalSeconds / 3600).toFixed(4);
+        }
+    }
+
+    document.querySelectorAll('.timer-widget').forEach(function (widget) {
+        const display = widget.querySelector('.timer-display');
+        const startBtn = widget.querySelector('.timer-start');
+        const pauseBtn = widget.querySelector('.timer-pause');
+        const resetBtn = widget.querySelector('.timer-reset');
+        const form = widget.closest('form');
+        let totalSeconds = Number(widget.dataset.initialSeconds || 0);
+        let timer = null;
+
+        function render() {
+            display.textContent = formatTime(totalSeconds);
+            updateHidden(widget, totalSeconds);
+        }
+
+        function start() {
+            if (timer) return;
+            timer = setInterval(function () {
+                totalSeconds += 1;
+                render();
+            }, 1000);
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            startBtn.textContent = '▶ Rodando';
+        }
+
+        function pause() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            startBtn.textContent = totalSeconds > 0 ? '▶ Continuar' : '▶ Iniciar';
+        }
+
+        function reset() {
+            pause();
+            totalSeconds = 0;
+            render();
+        }
+
+        startBtn.addEventListener('click', start);
+        pauseBtn.addEventListener('click', pause);
+        resetBtn.addEventListener('click', reset);
+
+        if (form) {
+            form.addEventListener('submit', function (event) {
+                render();
+                if (totalSeconds <= 0) {
+                    const ok = confirm('O cronômetro está zerado. Deseja salvar a atividade com 0 hora?');
+                    if (!ok) event.preventDefault();
+                }
+            });
+        }
+
+        render();
+    });
+})();
+</script>
+{% endblock %}

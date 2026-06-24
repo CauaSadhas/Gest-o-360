@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block public_content %}
+<div class="login-page landing-login">
+    {% include "_auth_hero.html" %}
+
+    <section class="login-card-wrap">
+        <form class="login-card" method="post" autocomplete="on">
+            <div>
+                <span class="form-kicker">ACESSO AO SISTEMA</span>
+                <h2>Acesse sua conta</h2>
+                <p>Digite o e-mail e a senha cadastrados por você.</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}
+                {% endif %}
+            {% endwith %}
+            <label>E-mail profissional
+                <input name="email" type="email" value="" placeholder="seu@email.com.br" autocomplete="email" required autofocus>
+            </label>
+            <label>Senha
+                <input name="password" type="password" value="" placeholder="Digite sua senha" autocomplete="current-password" required>
+            </label>
+            <button class="btn primary login-submit" type="submit">Entrar no sistema</button>
+            {% if registration_enabled %}
+                <div class="login-divider"><span>primeiro acesso</span></div>
+                <a class="btn auth-secondary" href="{{ url_for('register') }}">Criar minha conta</a>
+                <p class="auth-note">Para entrar na equipe, será necessário informar o código do escritório fornecido pelo administrador.</p>
+            {% endif %}
+        </form>
+    </section>
+</div>
+{% endblock %}

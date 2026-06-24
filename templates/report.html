@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Relatório de atividades</h1>
+        <p>Tempo gasto, quantidade de serviços e rentabilidade por cliente em {{ month_label(month) }}.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('export_report', month=month, client_id=client_id, collaborator=collaborator, service_type=service_type, format='csv') }}">Exportar CSV</a>
+        <a class="btn" href="{{ url_for('export_report', month=month, client_id=client_id, collaborator=collaborator, service_type=service_type, format='xlsx') }}">Exportar Excel</a>
+        <a class="btn" href="{{ url_for('export_report', month=month, client_id=client_id, collaborator=collaborator, service_type=service_type, format='pdf') }}">Exportar PDF</a>
+    </div>
+</div>
+
+<section class="card">
+    <form class="filters" method="get">
+        <input type="month" name="month" value="{{ month }}">
+        <select name="client_id"><option value="">Todos os clientes</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+        <input name="collaborator" placeholder="Colaborador" value="{{ collaborator }}">
+        <select name="service_type"><option value="">Todos os serviços</option>{% for s in service_types %}<option value="{{ s }}" {% if service_type == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+        <button class="btn">Filtrar</button>
+    </form>
+</section>
+
+<div class="grid three">
+    <section class="card"><h2>Clientes que deram mais trabalho</h2>{% for r in most_work %}<p class="rank-line"><span>{{ r.name }}</span><strong>{{ hours(r.total_hours) }}</strong></p>{% else %}<p>Sem dados.</p>{% endfor %}</section>
+    {% if can_view_financial %}<section class="card"><h2>Clientes mais rentáveis</h2>{% for r in most_profitable %}<p class="rank-line"><span>{{ r.name }}</span><strong>{{ money(r.value_per_hour) }}/h</strong></p>{% else %}<p>Sem dados.</p>{% endfor %}</section>{% endif %}
+    {% if can_view_financial %}<section class="card"><h2>Baixa rentabilidade</h2>{% for r in low_profit %}<p class="rank-line"><span>{{ r.name }}</span><strong>{{ r.rentability }}</strong></p>{% else %}<p>Sem dados.</p>{% endfor %}</section>{% endif %}
+</div>
+
+<section class="card">
+    <div class="section-heading">
+        <div>
+            <h2>Comparativo por cliente</h2>
+            <p>Este relatório não mistura recebimentos. As baixas financeiras ficam no Relatório de recebimentos.</p>
+        </div>
+        {% if can_view_financial %}<a class="btn secondary" href="{{ url_for('receipts_report', month=month) }}">Ver recebimentos</a>{% endif %}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Nome do cliente</th>
+                {% if can_view_financial %}<th>Valor mensal</th>{% endif %}
+                <th>Total de horas</th>
+                <th>Atividades</th>
+                {% if can_view_financial %}<th>Valor por hora</th><th>Classificação</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in report %}
+            <tr>
+                <td><a href="{{ url_for('client_detail', client_id=r.id, month=month) }}"><strong>{{ r.name }}</strong></a></td>
+                {% if can_view_financial %}<td>{{ money(r.monthly_fee) }}</td>{% endif %}
+                <td>{{ hours(r.total_hours) }}</td>
+                <td>{{ r.activities_count }}</td>
+                {% if can_view_financial %}
+                <td>{{ money(r.value_per_hour) if r.value_per_hour else '-' }}</td>
+                <td><span class="badge">{{ r.rentability }}</span></td>
+                {% endif %}
+            </tr>
+            {% else %}<tr><td colspan="6">Sem dados para o filtro escolhido.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

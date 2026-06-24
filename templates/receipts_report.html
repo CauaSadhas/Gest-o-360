@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Relatório de recebimentos</h1>
+        <p>Somente valores efetivamente baixados nas contas a receber em {{ month_label(month) }}.</p>
+    </div>
+    <div class="actions-row">
+        <a class="btn" href="{{ url_for('export_receipts_report', month=month, client_id=client_id, payment_method=payment_method, created_by=created_by, format='csv') }}">Exportar CSV</a>
+        <a class="btn" href="{{ url_for('export_receipts_report', month=month, client_id=client_id, payment_method=payment_method, created_by=created_by, format='xlsx') }}">Exportar Excel</a>
+        <a class="btn" href="{{ url_for('export_receipts_report', month=month, client_id=client_id, payment_method=payment_method, created_by=created_by, format='pdf') }}">Exportar PDF</a>
+    </div>
+</div>
+
+<section class="card report-notice">
+    <strong>Como este relatório funciona</strong>
+    <p>Ele considera a <b>data da baixa</b>, e não a data de vencimento. Baixas parciais aparecem separadamente e entram somente pelo valor recebido.</p>
+</section>
+
+<section class="card">
+    <form class="filters receipt-filters" method="get">
+        <label>
+            <span>Mês do recebimento</span>
+            <input type="month" name="month" value="{{ month }}">
+        </label>
+        <label>
+            <span>Cliente</span>
+            <select name="client_id">
+                <option value="">Todos os clientes</option>
+                {% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>
+            <span>Forma de pagamento</span>
+            <select name="payment_method">
+                <option value="">Todas as formas</option>
+                {% for item in method_rows %}<option value="{{ item.payment_method }}" {% if payment_method == item.payment_method %}selected{% endif %}>{{ item.payment_method }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>
+            <span>Responsável pela baixa</span>
+            <select name="created_by">
+                <option value="">Todos os responsáveis</option>
+                {% for item in responsible_rows %}<option value="{{ item.created_by }}" {% if created_by == item.created_by %}selected{% endif %}>{{ item.created_by }}</option>{% endfor %}
+            </select>
+        </label>
+        <button class="btn">Filtrar</button>
+        {% if client_id or payment_method or created_by %}<a class="btn secondary" href="{{ url_for('receipts_report', month=month) }}">Limpar filtros</a>{% endif %}
+    </form>
+</section>
+
+<div class="cards receipt-summary-cards">
+    <section class="card metric success">
+        <span>Total recebido no mês</span>
+        <strong>{{ money(summary.total_received) }}</strong>
+    </section>
+    <section class="card metric">
+        <span>Baixas registradas</span>
+        <strong>{{ summary.receipts_count }}</strong>
+    </section>
+    <section class="card metric">
+        <span>Clientes que pagaram</span>
+        <strong>{{ summary.unique_clients }}</strong>
+    </section>
+    <section class="card metric">
+        <span>Valor médio por baixa</span>
+        <strong>{{ money(summary.average_receipt) }}</strong>
+    </section>
+</div>
+
+<div class="grid two">
+    <section class="card">
+        <h2>Recebido por forma de pagamento</h2>
+        {% for item in by_method %}
+        <p class="rank-line"><span>{{ item.payment_method }} <small>({{ item.count }} baixa{% if item.count != 1 %}s{% endif %})</small></span><strong>{{ money(item.amount) }}</strong></p>
+        {% else %}<p>Nenhuma baixa encontrada no período.</p>{% endfor %}
+    </section>
+    <section class="card">
+        <h2>Recebido por cliente</h2>
+        {% for item in by_client[:8] %}
+        <p class="rank-line"><a href="{{ url_for('client_detail', client_id=item.client_id, month=month) }}">{{ item.client_name }}</a><strong>{{ money(item.amount) }}</strong></p>
+        {% else %}<p>Nenhum cliente com recebimento no período.</p>{% endfor %}
+    </section>
+</div>
+
+<section class="card">
+    <div class="section-heading">
+        <div>
+            <h2>Baixas realizadas no mês</h2>
+            <p>Cada linha representa uma baixa lançada. Uma mesma parcela pode ter mais de uma linha quando houve pagamento parcial.</p>
+        </div>
+        <span class="badge">{{ summary.receipts_count }} registro{% if summary.receipts_count != 1 %}s{% endif %}</span>
+    </div>
+    <div class="table-scroll">
+        <table class="receipts-table">
+            <thead>
+                <tr>
+                    <th>Data da baixa</th>
+                    <th>Cliente</th>
+                    <th>Cobrança</th>
+                    <th>Parcela</th>
+                    <th>Vencimento</th>
+                    <th>Valor da parcela</th>
+                    <th>Valor recebido</th>
+                    <th>Forma</th>
+                    <th>Responsável</th>
+                    <th>Observação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in rows %}
+                <tr>
+                    <td><strong>{{ item.payment_date|datebr }}</strong></td>
+                    <td><a href="{{ url_for('client_detail', client_id=item.client_id, month=month) }}"><strong>{{ item.client_name }}</strong></a></td>
+                    <td><a href="{{ url_for('receivable_detail', receivable_id=item.receivable_id) }}">{{ item.description }}</a></td>
+                    <td>{{ item.installment_number }}/{{ item.installment_total }}</td>
+                    <td>{{ item.due_date|datebr }}</td>
+                    <td>{{ money(item.installment_amount) }}</td>
+                    <td class="received-value"><strong>{{ money(item.received_amount) }}</strong></td>
+                    <td><span class="badge">{{ item.payment_method }}</span></td>
+                    <td>{{ item.created_by }}</td>
+                    <td>{{ item.payment_notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10">Nenhuma baixa foi registrada para o período e os filtros escolhidos.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if rows %}
+            <tfoot>
+                <tr>
+                    <td colspan="6"><strong>Total recebido</strong></td>
+                    <td class="received-value"><strong>{{ money(summary.total_received) }}</strong></td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</section>
+{% endblock %}
